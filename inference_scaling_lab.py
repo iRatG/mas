@@ -253,20 +253,22 @@ def analyze_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     for approach_name, approach_results in [('sync', sync_results), ('async', async_results)]:
         if not approach_results:
             continue
-            
-        success_rates = [r.get('success_rate', 0) for r in approach_results]
-        exec_times = [r.get('execution_time', 0) for r in approach_results]
+        
+        success_rates = [(r.get('success_rate') or 0) for r in approach_results]
+        exec_times = [float(r.get('execution_time', 0) or 0) for r in approach_results]
+        sr_clean = [float(x) for x in success_rates if isinstance(x, (int, float))]
+        et_clean = [float(x) for x in exec_times if isinstance(x, (int, float))]
         
         analysis['by_approach'][approach_name] = {
             'experiments_count': len(approach_results),
-            'avg_success_rate': round(statistics.mean(success_rates), 3),
-            'best_success_rate': max(success_rates),
-            'avg_execution_time': round(statistics.mean(exec_times), 3),
-            'fastest_time': min(exec_times)
+            'avg_success_rate': round(statistics.mean(sr_clean), 3) if sr_clean else 0.0,
+            'best_success_rate': max(sr_clean) if sr_clean else 0.0,
+            'avg_execution_time': round(statistics.mean(et_clean), 3) if et_clean else 0.0,
+            'fastest_time': min(et_clean) if et_clean else 0.0
         }
     
     # Поиск лучших конфигураций
-    best_overall = max(results, key=lambda r: (r.get('success_rate', 0), -r.get('execution_time', float('inf'))))
+    best_overall = max(results, key=lambda r: ((r.get('success_rate') or 0), -(r.get('execution_time') or float('inf'))))
     fastest_successful = min([r for r in results if r.get('success_rate', 0) == 1.0], 
                            key=lambda r: r.get('execution_time', float('inf')), default=None)
     
@@ -343,15 +345,18 @@ def print_summary(analysis: Dict[str, Any]):
     print(f"\n🏆 ЛУЧШИЕ КОНФИГУРАЦИИ:")
     
     best = analysis['best_configurations']['overall_best']
+    best_sr = float(best.get('success_rate') or 0.0)
+    best_time = float(best.get('execution_time') or 0.0)
     print(f"  • Лучшая общая: {best['approach']} "
           f"(кандидатов={best['n_candidates']}, ревьюеров={best['n_reviewers']}, ретраев={best['max_retries']})")
-    print(f"    Успешность: {best['success_rate']:.1%}, Время: {best['execution_time']:.3f}с")
+    print(f"    Успешность: {best_sr:.1%}, Время: {best_time:.3f}с")
     
     if 'fastest_perfect' in analysis['best_configurations']:
         fastest = analysis['best_configurations']['fastest_perfect']
         print(f"  • Самая быстрая (100%): {fastest['approach']} "
               f"(кандидатов={fastest['n_candidates']}, ревьюеров={fastest['n_reviewers']}, ретраев={fastest['max_retries']})")
-        print(f"    Время: {fastest['execution_time']:.3f}с")
+        fastest_time = float(fastest.get('execution_time') or 0.0)
+        print(f"    Время: {fastest_time:.3f}с")
 
 def main():
     """

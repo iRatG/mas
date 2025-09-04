@@ -86,7 +86,7 @@ def get_test_description(bug_id: int) -> str:
     }
     return descriptions.get(bug_id, f"Неизвестный тест для бага {bug_id}")
 
-def run_tests(code: str, bug_id: int, use_sandbox: bool = True, timeout: float = 5.0) -> Tuple[bool, str]:
+def run_tests(code: str, bug_id: int, use_sandbox: bool = False, timeout: float = 5.0) -> Tuple[bool, str]:
     """
     Гоним мини-тесты в песочнице.
     
