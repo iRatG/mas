@@ -177,16 +177,26 @@ class OverallAnalytics:
 
 # ------------------------ ЗАПУСК ПОДХОДОВ ---------------------------
 
-async def run_sync_approach(cases: List[Dict[str, Any]], seed: int, analytics: OverallAnalytics):
+async def run_sync_approach(cases: List[Dict[str, Any]], seed: int, analytics: OverallAnalytics, args):
     """Запуск синхронного подхода."""
     print(f"\n🔄 Запуск СИНХРОННОГО подхода (seed={seed})")
     print("-" * 50)
     
-    orchestrator = create_sync_orchestrator(seed=seed)
+    # Применяем параметры из командной строки если указаны
+    kwargs = {'seed': seed}
+    if args.n_candidates:
+        kwargs['n_candidates'] = args.n_candidates
+    if args.n_reviewers:
+        kwargs['n_reviewers'] = args.n_reviewers  
+    if args.max_retries:
+        kwargs['max_retries'] = args.max_retries
+        
+    orchestrator = create_sync_orchestrator(**kwargs)
     
     for bug in cases:
         print(f"\n--- SYNC кейс {bug['id']}: {bug['description']} ---")
-        result = orchestrator.run(bug["code"], bug["id"])
+        correlation_id = f"sync-case{bug['id']}-{int(time.time()*1000) % 10000}"
+        result = orchestrator.run(bug["code"], bug["id"], correlation_id)
         analytics.add_result(result)
         
         # Краткий вывод результата
@@ -198,13 +208,20 @@ async def run_sync_approach(cases: List[Dict[str, Any]], seed: int, analytics: O
             print(f"   Кандидатов: {metrics['total_candidates_generated']}")
             print(f"   Ретраев: {metrics['retries_used']}")
 
-async def run_async_approach(cases: List[Dict[str, Any]], seed: int, parallel: bool, analytics: OverallAnalytics):
+async def run_async_approach(cases: List[Dict[str, Any]], seed: int, parallel: bool, analytics: OverallAnalytics, args):
     """Запуск асинхронного подхода."""
     mode_text = "ПАРАЛЛЕЛЬНОМ" if parallel else "ПОСЛЕДОВАТЕЛЬНОМ"
     print(f"\n🚀 Запуск АСИНХРОННОГО подхода в {mode_text} режиме (seed={seed})")
     print("-" * 50)
     
-    coordinator, agents, metrics = create_async_system(seed=seed)
+    # Применяем параметры из командной строки если указаны
+    kwargs = {'seed': seed}
+    if args.n_reviewers:
+        kwargs['n_reviewers'] = args.n_reviewers
+    if args.max_retries:
+        kwargs['max_retries'] = args.max_retries
+        
+    coordinator, agents, metrics = create_async_system(**kwargs)
     
     # Запускаем агентов
     agent_tasks = [asyncio.create_task(agent.run()) for agent in agents]
@@ -217,7 +234,8 @@ async def run_async_approach(cases: List[Dict[str, Any]], seed: int, parallel: b
             async def process_case_parallel(idx: int, bug: Dict[str, Any]):
                 async with semaphore:
                     print(f"\n>>> [START] async кейс {bug['id']}: {bug['description']}")
-                    result = await coordinator.run_case(bug["code"], bug["id"], make_cid(idx))
+                    correlation_id = make_cid(idx) 
+                    result = await coordinator.run_case(bug["code"], bug["id"], correlation_id)
                     analytics.add_result(result)
                     
                     status_emoji = "✅" if result["status"] == "success" else "❌" if result["status"] == "failed" else "⏰"
@@ -232,7 +250,8 @@ async def run_async_approach(cases: List[Dict[str, Any]], seed: int, parallel: b
             # Последовательная обработка
             for i, bug in enumerate(cases, 1):
                 print(f"\n--- ASYNC кейс {bug['id']}: {bug['description']} ---")
-                result = await coordinator.run_case(bug["code"], bug["id"], make_cid(i))
+                correlation_id = make_cid(i)
+                result = await coordinator.run_case(bug["code"], bug["id"], correlation_id)
                 analytics.add_result(result)
                 
                 status_emoji = "✅" if result["status"] == "success" else "❌" if result["status"] == "failed" else "⏰"
@@ -269,6 +288,13 @@ def parse_args():
                        help="Использовать реальный OpenAI API вместо имитации")
     parser.add_argument("--openai-model", type=str, default="gpt-4", 
                        help="Модель OpenAI для использования (по умолчанию: gpt-4)")
+    # Параметры для инференс-скейлинга
+    parser.add_argument("--n-candidates", type=int, 
+                       help="Количество кандидатов для генерации (переопределяет настройки по умолчанию)")
+    parser.add_argument("--n-reviewers", type=int, 
+                       help="Количество ревьюеров (переопределяет настройки по умолчанию)")
+    parser.add_argument("--max-retries", type=int, 
+                       help="Максимальное количество ретраев (переопределяет настройки по умолчанию)")
     return parser.parse_args()
 
 async def main():
@@ -335,10 +361,10 @@ async def main():
     
     # Запуск подходов
     if args.approach in ["sync", "both"]:
-        await run_sync_approach(cases, args.seed, analytics)
+        await run_sync_approach(cases, args.seed, analytics, args)
     
     if args.approach in ["async", "both"]:
-        await run_async_approach(cases, args.seed, args.parallel, analytics)
+        await run_async_approach(cases, args.seed, args.parallel, analytics, args)
     
     # Вывод аналитики
     analytics.print_summary()

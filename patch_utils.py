@@ -10,6 +10,13 @@ from contextlib import redirect_stdout
 from io import StringIO
 from typing import Any, Dict, Tuple
 
+# Попытка импорта сэндбокса
+try:
+    from sandbox_runner import run_tests_sandbox
+    SANDBOX_AVAILABLE = True
+except ImportError:
+    SANDBOX_AVAILABLE = False
+
 def apply_patch(code: str, fix_text: str) -> str:
     """Наивное применение патча по тексту предложенного фикса."""
     patched = code
@@ -66,9 +73,42 @@ def apply_patch(code: str, fix_text: str) -> str:
 
     return patched
 
-def run_tests(code: str, bug_id: int) -> Tuple[bool, str]:
+def get_test_description(bug_id: int) -> str:
     """
-    Гоним мини-тесты в песочнице (exec в локальном dict).
+    Возвращает описание теста для заданного ID бага.
+    """
+    descriptions = {
+        1: "Тест суммирования массива [1,2,3] должен вернуть 6",
+        2: "process_data(None) -> None, process_data({'value': 3}) -> 6", 
+        3: "divide(4,2) -> 2, divide(4,0) -> None",
+        4: "add_numbers('2', 3) -> 5 (приведение типов)",
+        5: "count_down(2) должен выполниться без NameError"
+    }
+    return descriptions.get(bug_id, f"Неизвестный тест для бага {bug_id}")
+
+def run_tests(code: str, bug_id: int, use_sandbox: bool = True, timeout: float = 5.0) -> Tuple[bool, str]:
+    """
+    Гоним мини-тесты в песочнице.
+    
+    Args:
+        code: Код для тестирования
+        bug_id: ID бага для определения типа теста
+        use_sandbox: Использовать безопасный сэндбокс (рекомендуется)
+        timeout: Таймаут выполнения в секундах
+        
+    Returns:
+        Tuple[bool, str]: (успех, лог выполнения)
+    """
+    # Используем сэндбокс если доступен и запрошен
+    if use_sandbox and SANDBOX_AVAILABLE:
+        return run_tests_sandbox(code, bug_id, timeout)
+    
+    # Fallback на прямое выполнение
+    return _run_tests_direct(code, bug_id)
+
+def _run_tests_direct(code: str, bug_id: int) -> Tuple[bool, str]:
+    """
+    Прямое выполнение тестов через exec (менее безопасно).
     Для каждого бага — простой оракул.
     """
     env: Dict[str, Any] = {}
@@ -78,16 +118,17 @@ def run_tests(code: str, bug_id: int) -> Tuple[bool, str]:
             exec(code, env, env)
             if bug_id == 1:
                 res = env["calculate_sum"]([1, 2, 3])
-                assert res == 6
+                assert res == 6, f"Expected 6, got {res}"
             elif bug_id == 2:
-                assert env["process_data"](None) is None
-                assert env["process_data"]({"value": 3}) == 6
+                assert env["process_data"](None) is None, "process_data(None) should return None"
+                result = env["process_data"]({"value": 3})
+                assert result == 6, f"process_data({{'value': 3}}) should return 6, got {result}"
             elif bug_id == 3:
-                assert env["divide"](4, 2) == 2
-                assert env["divide"](4, 0) is None
+                assert env["divide"](4, 2) == 2, "divide(4, 2) should return 2"
+                assert env["divide"](4, 0) is None, "divide(4, 0) should return None"
             elif bug_id == 4:
                 res = env["add_numbers"]("2", 3)
-                assert res == 5
+                assert res == 5, f"add_numbers('2', 3) should return 5, got {res}"
             elif bug_id == 5:
                 # Должно просто выполниться без NameError
                 env["count_down"](2)
@@ -95,4 +136,4 @@ def run_tests(code: str, bug_id: int) -> Tuple[bool, str]:
                 print("Нет тестов для этого кейса; считаем passed.")
         return True, out.getvalue()
     except Exception as e:
-        return False, f"TEST FAILED: {e}\n--- Output ---\n{out.getvalue()}"
+        return False, f"TEST FAILED: {type(e).__name__}: {e}\n--- Output ---\n{out.getvalue()}"

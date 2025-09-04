@@ -53,7 +53,7 @@ class SyncOrchestrator:
     max_retries: int = 2
     rng: random.Random = field(default_factory=lambda: random.Random(42))
     
-    def run(self, code: str, bug_id: int) -> Dict[str, Any]:
+    def run(self, code: str, bug_id: int, correlation_id: str = None) -> Dict[str, Any]:
         """Линейный цикл: найти → сгенерировать N фиксов → ревью (голосование) → тесты → успех/ретрай."""
         metrics = SyncApproachMetrics()
         metrics.start_time = time.time()
