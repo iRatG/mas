@@ -66,6 +66,9 @@ tmp/
 *.json
 !requirements.txt
 !package.json
+inference_scaling_results_*.csv
+inference_scaling_analysis_*.json
+quick_test.py
 
 # OpenAI API keys (дополнительная защита)
 *api_key*
