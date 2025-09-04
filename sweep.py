@@ -19,7 +19,11 @@ PY = sys.executable  # текущая интерпретация Python
 ROOT = Path(__file__).resolve().parent
 
 def run_case(approach: str, seed: int, extra_args: list[str]) -> dict:
-    """Запуск твоего main.py и возврат сводки по результатам из stdout."""
+    """Запускает main.py с заданным набором аргументов и парсит итоговые метрики.
+
+    Возвращает компактный словарь (успехи/фейлы/среднее время), извлечённый из stdout.
+    Для прод-варианта предпочтительно получать JSON от самого main.py.
+    """
     cmd = [PY, str(ROOT / "main.py"), "--approach", approach, "--seed", str(seed), "--verbose"]
     cmd += extra_args
     out = subprocess.run(cmd, capture_output=True, text=True, check=False)
@@ -27,8 +31,11 @@ def run_case(approach: str, seed: int, extra_args: list[str]) -> dict:
     return parse_stdout(out.stdout)
 
 def parse_stdout(stdout: str) -> dict:
-    # Очень простой парсер: ищем ключевые строки из твоего README-образца.
-    # Для прод-версии можно сделать JSON-лог в самом main.py.
+    """Грубый парсер stdout: извлекает базовые метрики из текстового вывода.
+
+    Ищет ключевые маркеры в строках и возвращает агрегаты. Упрощённая версия
+    для демонстрации — может быть заменена на парсинг JSON при поддержке main.py.
+    """
     summary = {"success_cases": 0, "failed_cases": 0, "avg_time": None}
     lines = [l.strip() for l in stdout.splitlines()]
     success = failed = 0

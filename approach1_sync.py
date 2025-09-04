@@ -30,9 +30,11 @@ class SyncApproachMetrics:
     
     @property
     def execution_time(self) -> float:
+        """Возвращает длительность выполнения (секунды)."""
         return self.end_time - self.start_time
     
     def to_dict(self) -> Dict[str, Any]:
+        """Преобразует метрики в словарь для сериализации/логирования."""
         return {
             "execution_time_seconds": round(self.execution_time, 3),
             "total_candidates_generated": self.total_candidates_generated,
@@ -121,6 +123,7 @@ class SyncOrchestrator:
         }
 
     def _seed_next(self):
+        """Обновляет глобальный seed случайности для воспроизводимых голосований."""
         # Эмуляция «случайности» ревью, завязанной на rng
         s = self.rng.random()
         random.seed(int(s * 1e9) % (2**32 - 1))

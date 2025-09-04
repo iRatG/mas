@@ -36,9 +36,11 @@ class AsyncApproachMetrics:
     
     @property
     def execution_time(self) -> float:
+        """Возвращает длительность выполнения (секунды)."""
         return self.end_time - self.start_time
     
     def to_dict(self) -> Dict[str, Any]:
+        """Преобразует метрики в словарь для дальнейшей сериализации/аналитики."""
         return {
             "execution_time_seconds": round(self.execution_time, 3),
             "messages_sent": self.messages_sent,
@@ -66,7 +68,11 @@ class Message:
     attempt: int = 0
 
 class AsyncAgent:
-    """Базовый класс для асинхронных агентов."""
+    """Базовый агент с входной очередью и счётчиками сообщений.
+
+    Хранит ссылку на общие метрики и предоставляет send/recv интерфейс
+    для обмена сообщениями между агентами.
+    """
     
     def __init__(self, name: str, metrics: AsyncApproachMetrics):
         self.name = name
@@ -75,13 +81,13 @@ class AsyncAgent:
         self.metrics = metrics
 
     async def send(self, recipient: "AsyncAgent", msg: Message):
-        """Отправка сообщения другому агенту."""
+        """Отправляет сообщение в inbox другого агента и инкрементирует счётчик."""
         self.log.debug("-> %s (%s)", recipient.name, msg.type)
         self.metrics.messages_sent += 1
         await recipient.inbox.put((self, msg))
 
     async def recv(self, timeout: Optional[float] = None) -> Tuple["AsyncAgent", Message]:
-        """Получение сообщения с возможным таймаутом."""
+        """Получает сообщение из своей очереди, учитывая таймаут (если задан)."""
         try:
             sender, msg = await asyncio.wait_for(self.inbox.get(), timeout=timeout)
             self.metrics.messages_received += 1
@@ -91,7 +97,7 @@ class AsyncAgent:
             raise
 
 class Analyst(AsyncAgent):
-    """Агент для анализа кода и поиска багов."""
+    """Агент-аналитик: принимает код и отвечает отчётом о багах."""
     
     async def run(self):
         """Основной цикл агента-аналитика."""
@@ -105,7 +111,7 @@ class Analyst(AsyncAgent):
                 break
 
 class Fixer(AsyncAgent):
-    """Агент для генерации исправлений."""
+    """Агент-исправитель: по отчёту генерирует кандидатов-исправлений."""
     
     async def run(self):
         """Основной цикл агента-исправителя."""
@@ -120,7 +126,7 @@ class Fixer(AsyncAgent):
                 break
 
 class Controller(AsyncAgent):
-    """Агент для контроля качества и ревью исправлений."""
+    """Агент-контролёр: проводит голосование ревьюеров и утверждает фиксы."""
     
     def __init__(self, name: str, n_reviewers: int, rng: random.Random, metrics: AsyncApproachMetrics):
         super().__init__(name, metrics)
@@ -149,12 +155,12 @@ class Controller(AsyncAgent):
                 break
 
     def _seed_next(self):
-        """Управление случайностью для воспроизводимости."""
+        """Обновляет seed для воспроизводимости вердиктов ревью."""
         s = self.rng.random()
         random.seed(int(s * 1e9) % (2**32 - 1))
 
 class Coordinator(AsyncAgent):
-    """Координатор для управления процессом исправления багов."""
+    """Координатор: связывает агентов, оркестрирует попытки и тесты."""
     
     def __init__(self, name: str, analyst: Analyst, fixer: Fixer, controller: Controller, 
                  max_retries: int = 2, step_timeout: float = 5.0, metrics: AsyncApproachMetrics = None):
@@ -166,7 +172,7 @@ class Coordinator(AsyncAgent):
         self.step_timeout = step_timeout
 
     async def run_case(self, code: str, bug_id: int, cid: str) -> Dict[str, Any]:
-        """Запуск обработки одного кейса."""
+        """Запускает полный цикл обработки одного кейса с данным correlation id."""
         self.metrics.start_time = time.time()
         
         await self.send(self.analyst, Message("analyze_code", code, cid))
@@ -223,7 +229,7 @@ class Coordinator(AsyncAgent):
         }
 
     async def _await_type(self, msg_type: str, cid: str):
-        """Ожидание сообщения определённого типа."""
+        """Ожидает сообщение определённого типа/коррелятора от агентов с таймаутом."""
         try:
             while True:
                 sender, msg = await asyncio.wait_for(self.inbox.get(), timeout=self.step_timeout)
