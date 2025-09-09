@@ -73,3 +73,7 @@ quick_test.py
 # OpenAI API keys (дополнительная защита)
 *api_key*
 *openai*key*
+
+# Local backups/archives
+archive/
+legacy_backup/

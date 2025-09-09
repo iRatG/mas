@@ -1,59 +1,69 @@
 # MAS Demo: Multi-Agent System для исправления багов
 
-Демонстрация двух подходов к автоматическому исправлению багов в коде:
-1. **Синхронный оркестратор** - линейная обработка с ретраями
-2. **Асинхронная шина** - агентная архитектура с асинхронной коммуникацией
+Демонстрация нескольких подходов к автоматическому исправлению багов в коде:
+- **Синхронный оркестратор (sync)** — линейная обработка с ретраями
+- **Асинхронная шина (async)** — агентная архитектура с сообщениями
+- **Однопроходный бейслайн (baseline)** — простой вызов LLM без памяти
+- **Итеративный подход (iterative)** — с «памятью» попыток и метриками
 
-## Структура проекта
+## Структура проекта (src-layout)
 
 ```
 MAS/
-├── main.py              # Главный модуль с запуском и аналитикой
-├── test_cases.py        # Тест-кейсы с багами
-├── approach1_sync.py    # Синхронный подход
-├── approach2_async.py   # Асинхронный подход  
-├── llm_utils.py         # Имитация LLM функций
-├── patch_utils.py       # Применение патчей и тестирование
-├── source.py            # Оригинальный код (для справки)
-└── README.md           # Этот файл
+├── src/mas/
+│   ├── cli/                   # Точки входа: main, baseline, iterative, compare
+│   ├── approaches/            # sync, async_, iterative/
+│   ├── llm/                   # real_llm, mock_client
+│   ├── evaluation/            # test_cases, patching, sandbox
+│   ├── experiments/           # sweep, inference_scaling_lab
+│   └── analytics/results/     # JSON/CSV результаты
+├── docs/                      # документация
+├── examples/                  # демо-скрипты и образцы кода
+├── pyproject.toml             # src-layout
+├── requirements.txt
+├── env_example.txt
+└── README.md
 ```
 
 ## Возможности запуска
 
-### Основные режимы
+### Запуск (рекомендуемый модульный)
 
 ```bash
-# Запуск обоих подходов для сравнения
-python main.py --approach both
+# Синхронный / асинхронный (имитация LLM)
+python -X utf8 -m mas.cli.main --approach sync  --cases 1 2 3
+python -X utf8 -m mas.cli.main --approach async --cases 1 2 3
 
-# Только синхронный подход
-python main.py --approach sync
+# Реальный OpenAI API (нужен .env с OPENAI_API_KEY)
+python -X utf8 -m mas.cli.main --use-openai --openai-model gpt-4 --approach both --cases 1 2 3
 
-# Только асинхронный подход  
-python main.py --approach async
+# Однопроходный бейслайн
+python -X utf8 -m mas.cli.baseline
 
-# Асинхронный подход с параллельной обработкой
-python main.py --approach async --parallel
+# Итеративный подход с памятью
+python -X utf8 -m mas.cli.iterative
+
+# Сравнение всех подходов (метрики в src/mas/analytics/results/)
+python -X utf8 -m mas.cli.compare
+```
+
+Примечание для Windows/UTF‑8:
+```powershell
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 ```
 
 ### Дополнительные параметры
 
 ```bash
-# Выбор конкретных тест-кейсов
-python main.py --cases 1 3 5
-
-# Изменение seed для воспроизводимости
-python main.py --seed 123
-
-# Подробные логи
-python main.py --verbose
-
-# Сохранение результатов в JSON
-python main.py --save-results results.json
-
-# Комбинирование параметров
-python main.py --approach both --parallel --verbose --seed 42 --save-results full_analysis.json
+# Выбор кейсов, seed, логи, сохранение результатов (через мас.cli.main)
+python -X utf8 -m mas.cli.main --approach both --cases 1 3 5 --seed 123 --verbose --save-results results.json
 ```
+
+### LLM и окружение
+
+- Имитация/базовый LLM: `mas.llm.mock_client`
+- Реальный OpenAI API: `mas.llm.real_llm` (см. `docs/SETUP_OPENAI.md`), .env из `env_example.txt`
+- Итеративный процесс: `python -X utf8 -m mas.cli.iterative`
 
 ## Тест-кейсы
 
@@ -140,8 +150,8 @@ python main.py --approach both --parallel --verbose --seed 42 --save-results ful
 
 ## Требования
 
-- Python 3.10+
-- Только стандартная библиотека (без внешних зависимостей)
+- Python 3.8+
+- Зависимости из `requirements.txt` (openai>=1.x, python-dotenv>=1.x и др.)
 
 ## Архитектурные особенности
 

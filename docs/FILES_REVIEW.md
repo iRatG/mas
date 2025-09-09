@@ -31,6 +31,21 @@
 - **`env_example.txt`** (328 bytes) - Пример .env файла
 - **`.gitignore`** (776 bytes) - Исключения для Git
 
+### 🧩 Новая модульная структура (добавлена, исходники сохранены)
+
+- **`src/mas/cli/main.py`** — единая точка входа (делегирует на legacy `main.py`)
+- **`src/mas/approaches/sync.py`** — реэкспорт `approach1_sync.py`
+- **`src/mas/approaches/async_.py`** — реэкспорт `approach2_async.py`
+- **`src/mas/approaches/iterative/runner.py`** — обёртка над `iterative_process.py`
+- **`src/mas/llm/openai_client.py`** — адаптер к `real_llm.py`
+- **`src/mas/llm/mock_client.py`** — адаптер к `llm_utils.py`
+- **`src/mas/evaluation/test_cases.py`** — реэкспорт `BUG_CASES`
+- **`src/mas/evaluation/patching.py`** — реэкспорт `patch_utils`
+- **`src/mas/evaluation/sandbox.py`** — реэкспорт `sandbox_runner`
+- **`src/mas/experiments/sweep.py`** — адаптер к `sweep.py`
+- **`src/mas/experiments/scaling_lab.py`** — адаптер к `inference_scaling_lab.py`
+- **`src/mas/config/settings.py`** — загрузка `.env`
+
 ## ❌ ФАЙЛЫ ИСКЛЮЧЁННЫЕ ИЗ КОММИТА
 
 ### 🔒 Секретные данные (в .gitignore)
